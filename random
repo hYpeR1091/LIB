@@ -1,0 +1,452 @@
+-- ╔══════════════════════════════════════════════════════════╗
+-- ║               IMPULSE X v3.0 - FIXED VERSION             ║
+-- ╚══════════════════════════════════════════════════════════╝
+
+local ImpulseX = {}
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+local HttpService = game:GetService("HttpService")
+
+-- Sound Effects
+local ClickSound = Instance.new("Sound")
+ClickSound.SoundId = "rbxassetid://535716488"
+ClickSound.Volume = 0.4
+ClickSound.Parent = SoundService
+
+local HoverSound = Instance.new("Sound")
+HoverSound.SoundId = "rbxassetid://6535114727"
+HoverSound.Volume = 0.3
+HoverSound.Parent = SoundService
+
+local OpenSound = Instance.new("Sound")
+OpenSound.SoundId = "rbxassetid://9114397500"
+OpenSound.Volume = 0.6
+OpenSound.Parent = SoundService
+
+-- Tween Helper
+local function tween(obj, props, time, style, direction)
+    style = style or Enum.EasingStyle.Quint
+    direction = direction or Enum.EasingDirection.Out
+    local info = TweenInfo.new(time or 0.4, style, direction, 0, false, 0)
+    local t = TweenService:Create(obj, info, props)
+    t:Play()
+    return t
+end
+
+-- Ripple Effect
+local function createRipple(parent, x, y, color)
+    color = color or Color3.fromRGB(255, 255, 255)
+    local ripple = Instance.new("Frame")
+    ripple.Size = UDim2.new(0, 0, 0, 0)
+    ripple.Position = UDim2.new(0, x, 0, y)
+    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    ripple.BackgroundColor3 = color
+    ripple.BackgroundTransparency = 0.5
+    ripple.ZIndex = 999
+    ripple.BorderSizePixel = 0
+    ripple.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = ripple
+
+    local glow = Instance.new("ImageLabel")
+    glow.Size = UDim2.new(2.5, 0, 2.5, 0)
+    glow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    glow.BackgroundTransparency = 1
+    glow.Image = "rbxassetid://4996891970"
+    glow.ImageColor3 = color
+    glow.ImageTransparency = 0.7
+    glow.Parent = ripple
+
+    tween(ripple, {Size = UDim2.new(0, 400, 0, 400), BackgroundTransparency = 1}, 0.8, Enum.EasingStyle.Quint)
+    tween(glow, {ImageTransparency = 1, Size = UDim2.new(0, 800, 0, 800)}, 0.8)
+    task.delay(0.8, function() 
+        if ripple and ripple.Parent then
+            ripple:Destroy() 
+        end
+    end)
+end
+
+-- Notification System (FIXED)
+local Notifications = {}
+local NotifGui = nil
+
+local function notify(text, duration, icon, color)
+    duration = duration or 4
+    icon = icon or "⭐"
+    color = color or Color3.fromHSV(tick() % 8 / 8, 1, 1)
+
+    -- Create notification container if it doesn't exist
+    if not NotifGui or not NotifGui.Parent then
+        NotifGui = Instance.new("ScreenGui")
+        NotifGui.Name = "ImpulseX_Notifs"
+        NotifGui.ResetOnSpawn = false
+        NotifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        
+        -- Try CoreGui first, fallback to PlayerGui
+        local success = pcall(function()
+            NotifGui.Parent = game:GetService("CoreGui")
+        end)
+        
+        if not success then
+            NotifGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+        end
+    end
+
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 400, 0, 90)
+    notif.Position = UDim2.new(1, 20, 0, #Notifications * 110 + 20)
+    notif.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+    notif.BorderSizePixel = 0
+    notif.ZIndex = 1000
+    notif.Parent = NotifGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 18)
+    corner.Parent = notif
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 2.5
+    stroke.Color = color
+    stroke.Transparency = 0.5
+    stroke.Parent = notif
+
+    local glow = Instance.new("ImageLabel")
+    glow.Image = "rbxassetid://4996891970"
+    glow.ImageColor3 = color
+    glow.Size = UDim2.new(1.3, 0, 1.6, 0)
+    glow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    glow.BackgroundTransparency = 1
+    glow.ImageTransparency = 0.85
+    glow.ZIndex = -1
+    glow.Parent = notif
+
+    local ico = Instance.new("TextLabel")
+    ico.Text = icon
+    ico.Size = UDim2.new(0, 70, 1, 0)
+    ico.BackgroundTransparency = 1
+    ico.Font = Enum.Font.GothamBlack
+    ico.TextSize = 36
+    ico.TextColor3 = color
+    ico.TextXAlignment = Enum.TextXAlignment.Left
+    ico.Position = UDim2.new(0, 20, 0, 0)
+    ico.Parent = notif
+
+    local title = Instance.new("TextLabel")
+    title.Text = text
+    title.Size = UDim2.new(1, -100, 1, 0)
+    title.Position = UDim2.new(0, 90, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextWrapped = true
+    title.Parent = notif
+
+    table.insert(Notifications, notif)
+    tween(notif, {Position = UDim2.new(1, -420, notif.Position.Y.Scale, notif.Position.Y.Offset)}, 0.7, Enum.EasingStyle.Back)
+
+    -- Rainbow animation
+    local rainbowConnection
+    rainbowConnection = RunService.RenderStepped:Connect(function()
+        if notif.Parent then
+            local hue = (tick() % 8) / 8
+            local rainbowColor = Color3.fromHSV(hue, 1, 1)
+            stroke.Color = rainbowColor
+            glow.ImageColor3 = rainbowColor
+        else
+            rainbowConnection:Disconnect()
+        end
+    end)
+
+    task.delay(duration, function()
+        tween(notif, {Position = UDim2.new(1, 20, notif.Position.Y.Scale, notif.Position.Y.Offset)}, 0.5)
+        task.wait(0.6)
+        
+        if notif and notif.Parent then
+            notif:Destroy()
+        end
+        
+        local index = table.find(Notifications, notif)
+        if index then
+            table.remove(Notifications, index)
+        end
+        
+        -- Reposition remaining notifications
+        for i, n in ipairs(Notifications) do
+            if n and n.Parent then
+                tween(n, {Position = UDim2.new(1, -420, 0, (i-1)*110 + 20)}, 0.4)
+            end
+        end
+    end)
+end
+
+-- Main Window Creator
+function ImpulseX:CreateWindow(config)
+    config = config or {}
+    local Window = {
+        Tabs = {}, 
+        CurrentTab = nil, 
+        Notifications = true, 
+        Theme = "Dark",
+        Notify = notify
+    }
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "ImpulseX_" .. HttpService:GenerateGUID(false):sub(1, 8)
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Try CoreGui first, fallback to PlayerGui
+    local success = pcall(function()
+        ScreenGui.Parent = game:GetService("CoreGui")
+    end)
+    
+    if not success then
+        ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    -- Blur Background
+    local Blur = Instance.new("BlurEffect")
+    Blur.Size = 0
+    Blur.Parent = Lighting
+    tween(Blur, {Size = 35}, 1.2)
+
+    -- Main Container
+    local Main = Instance.new("Frame")
+    Main.Size = UDim2.new(0, 1000, 0, 680)
+    Main.Position = UDim2.new(0.5, -500, 0.5, -340)
+    Main.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
+    Main.BackgroundTransparency = 0.35
+    Main.BorderSizePixel = 0
+    Main.ClipsDescendants = true
+    Main.Parent = ScreenGui
+
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 22)
+    MainCorner.Parent = Main
+
+    -- Glass Overlay
+    local Glass = Instance.new("Frame")
+    Glass.Size = UDim2.new(1, 0, 1, 0)
+    Glass.BackgroundTransparency = 0.88
+    Glass.BackgroundColor3 = Color3.new(1, 1, 1)
+    Glass.ZIndex = -2
+    Glass.BorderSizePixel = 0
+    Glass.Parent = Main
+
+    local GlassGrad = Instance.new("UIGradient")
+    GlassGrad.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 0.85),
+        NumberSequenceKeypoint.new(0.5, 0.6),
+        NumberSequenceKeypoint.new(1, 0.9)
+    }
+    GlassGrad.Parent = Glass
+
+    -- Animated Border
+    local Border = Instance.new("UIStroke")
+    Border.Thickness = 4
+    Border.Transparency = 0.3
+    Border.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    Border.Parent = Main
+
+    local borderConnection = RunService.RenderStepped:Connect(function()
+        if Main.Parent then
+            local hue = (tick() % 12) / 12
+            Border.Color = Color3.fromHSV(hue, 1, 1)
+        else
+            borderConnection:Disconnect()
+        end
+    end)
+
+    -- Holographic Particles (FIXED with ClipsDescendants)
+    local ParticleContainer = Instance.new("Frame")
+    ParticleContainer.Size = UDim2.new(1, 0, 1, 0)
+    ParticleContainer.BackgroundTransparency = 1
+    ParticleContainer.ClipsDescendants = true
+    ParticleContainer.ZIndex = 0
+    ParticleContainer.BorderSizePixel = 0
+    ParticleContainer.Parent = Main
+
+    for i = 1, 50 do
+        local p = Instance.new("Frame")
+        p.Size = UDim2.new(0, math.random(3, 8), 0, math.random(3, 8))
+        p.Position = UDim2.new(math.random(), 0, math.random(), 0)
+        p.BackgroundColor3 = Color3.fromHSV(math.random(), 0.8, 1)
+        p.BackgroundTransparency = 0.2
+        p.BorderSizePixel = 0
+        p.ZIndex = 0
+        p.Parent = ParticleContainer
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(1, 0)
+        c.Parent = p
+
+        task.spawn(function()
+            while p.Parent do
+                tween(p, {
+                    Position = UDim2.new(math.random(), 0, math.random(), 0),
+                    Rotation = math.random(-360, 360),
+                    BackgroundTransparency = math.random(30, 90) / 100
+                }, math.random(15, 35), Enum.EasingStyle.Linear)
+                task.wait(math.random(15, 35))
+            end
+        end)
+    end
+
+    -- Topbar
+    local Topbar = Instance.new("Frame")
+    Topbar.Size = UDim2.new(1, 0, 0, 80)
+    Topbar.BackgroundTransparency = 0.5
+    Topbar.BackgroundColor3 = Color3.new(0, 0, 0)
+    Topbar.BorderSizePixel = 0
+    Topbar.Parent = Main
+
+    local TopCorner = Instance.new("UICorner")
+    TopCorner.CornerRadius = UDim.new(0, 22)
+    TopCorner.Parent = Topbar
+
+    -- Logo Orb
+    local Orb = Instance.new("Frame")
+    Orb.Size = UDim2.new(0, 60, 0, 60)
+    Orb.Position = UDim2.new(0, 20, 0.5, -30)
+    Orb.BackgroundColor3 = Color3.fromHSV(0, 1, 1)
+    Orb.BorderSizePixel = 0
+    Orb.Parent = Topbar
+
+    local OrbC = Instance.new("UICorner")
+    OrbC.CornerRadius = UDim.new(1, 0)
+    OrbC.Parent = Orb
+
+    local OrbGlow = Instance.new("ImageLabel")
+    OrbGlow.Size = UDim2.new(4, 0, 4, 0)
+    OrbGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    OrbGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+    OrbGlow.BackgroundTransparency = 1
+    OrbGlow.Image = "rbxassetid://4996891970"
+    OrbGlow.ImageColor3 = Orb.BackgroundColor3
+    OrbGlow.ImageTransparency = 0.6
+    OrbGlow.Parent = Orb
+
+    local orbConnection = RunService.RenderStepped:Connect(function()
+        if Orb.Parent then
+            local h = (tick() % 12) / 12
+            local col = Color3.fromHSV(h, 1, 1)
+            Orb.BackgroundColor3 = col
+            OrbGlow.ImageColor3 = col
+        else
+            orbConnection:Disconnect()
+        end
+    end)
+
+    -- Title & Subtitle
+    local Title = Instance.new("TextLabel")
+    Title.Text = config.Title or "IMPULSE X"
+    Title.Font = Enum.Font.GothamBlack
+    Title.TextSize = 32
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 100, 0, 12)
+    Title.Size = UDim2.new(0, 500, 0, 40)
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Topbar
+
+    local Subtitle = Instance.new("TextLabel")
+    Subtitle.Text = config.Subtitle or "ULTIMATE HUB 2025"
+    Subtitle.Font = Enum.Font.Gotham
+    Subtitle.TextSize = 16
+    Subtitle.TextColor3 = Color3.fromRGB(170, 170, 255)
+    Subtitle.BackgroundTransparency = 1
+    Subtitle.Position = UDim2.new(0, 102, 0, 48)
+    Subtitle.Size = UDim2.new(0, 500, 0, 25)
+    Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    Subtitle.Parent = Topbar
+
+    -- Close Button
+    local Close = Instance.new("TextButton")
+    Close.Size = UDim2.new(0, 40, 0, 40)
+    Close.Position = UDim2.new(1, -50, 0.5, -20)
+    Close.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    Close.Text = "×"
+    Close.TextColor3 = Color3.new(1, 1, 1)
+    Close.Font = Enum.Font.GothamBlack
+    Close.TextSize = 24
+    Close.AutoButtonColor = false
+    Close.BackgroundTransparency = 0.3
+    Close.BorderSizePixel = 0
+    Close.Parent = Topbar
+
+    local CloseC = Instance.new("UICorner")
+    CloseC.CornerRadius = UDim.new(1, 0)
+    CloseC.Parent = Close
+
+    Close.MouseButton1Click:Connect(function()
+        ClickSound:Play()
+        tween(Blur, {Size = 0}, 0.8)
+        tween(Main, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)}, 0.8, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.8)
+        ScreenGui:Destroy()
+        Blur:Destroy()
+    end)
+
+    Close.MouseEnter:Connect(function()
+        HoverSound:Play()
+        tween(Close, {BackgroundTransparency = 0, Size = UDim2.new(0, 45, 0, 45)}, 0.2)
+    end)
+
+    Close.MouseLeave:Connect(function()
+        tween(Close, {BackgroundTransparency = 0.3, Size = UDim2.new(0, 40, 0, 40)}, 0.2)
+    end)
+
+    -- Dragging
+    local dragging, dragInput, dragStart, startPos
+    
+    Topbar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    Topbar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Main.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    -- Welcome Sequence
+    pcall(function() OpenSound:Play() end)
+    notify("IMPULSE X v3.0", 5, "⚡")
+    notify("Welcome back, " .. game.Players.LocalPlayer.Name, 6, "👑")
+    notify("You are now unstoppable.", 7, "🔥")
+
+    return Window
+end
+
+return ImpulseX
