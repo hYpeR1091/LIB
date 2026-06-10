@@ -1,0 +1,85 @@
+local Library = {}
+Library.__index = Library
+
+-- Helper function to make drawing object creation cleaner
+local function create(class, properties)
+	local obj = Drawing.new(class)
+	for prop, val in pairs(properties) do
+		obj[prop] = val
+	end
+	return obj
+end
+
+-- Constructor for a new UI Panel
+function Library.newPanel(title, size, position)
+	local self = setmetatable({}, Library)
+	
+	size = size or Vector2.new(800, 500)
+	position = position or Vector2.new(300, 200)
+	
+	-- 1. Main Background Box (Your exact styling parameters)
+	self.MainBox = create("Square", {
+		Size = size,
+		Position = position,
+		Color = Color3.fromRGB(20, 20, 25), -- Modern dark gray/black
+		Filled = true,
+		Transparency = 0.9,
+		Visible = true,
+		ZIndex = 1
+	})
+	
+	-- 2. Sleek Border Outline
+	self.Border = create("Square", {
+		Size = size,
+		Position = position,
+		Color = Color3.fromRGB(120, 120, 120), -- Your gray color choice
+		Thickness = 2,
+		Filled = false,
+		Transparency = 1,
+		Visible = true,
+		ZIndex = 2
+	})
+	
+	-- 3. Top Title Bar (Gives it that "Panel/Window" look)
+	self.TitleBar = create("Square", {
+		Size = Vector2.new(size.X, 25),
+		Position = position,
+		Color = Color3.fromRGB(30, 30, 35),
+		Filled = true,
+		Transparency = 1,
+		Visible = true,
+		ZIndex = 2
+	})
+	
+	-- 4. Title Text
+	self.TitleText = create("Text", {
+		Text = title or "CONTROL PANEL",
+		Size = 14,
+		Position = position + Vector2.new(10, 5),
+		Color = Color3.fromRGB(200, 200, 200),
+		Center = false,
+		Outline = false,
+		Visible = true,
+		ZIndex = 3
+	})
+	
+	return self
+end
+
+-- Method to toggle visibility of the whole panel easily
+function Library:SetVisible(visible)
+	self.MainBox.Visible = visible
+	self.Border.Visible = visible
+	self.TitleBar.Visible = visible
+	self.TitleText.Visible = visible
+end
+
+-- Method to clean up memory when closing the library
+function Library:Destroy()
+	self.MainBox:Remove()
+	self.Border:Remove()
+	self.TitleBar:Remove()
+	self.TitleText:Remove()
+end
+
+return Library
